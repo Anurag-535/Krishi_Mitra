@@ -12,14 +12,18 @@ interface NPKData {
 }
 
 interface NPKResponse {
-  prediction: string;
-  confidence?: number;
-  recommendations?: string[];
-  nutrient_status?: {
-    nitrogen: string;
-    phosphorus: string;
-    potassium: string;
+  success: boolean;
+  timestamp: string;
+  input: {
+    nitrogen: number;
+    phosphorus: number;
+    potassium: number;
+    ph: number;
+    moisture: number;
+    temperature: number;
+    humidity: number;
   };
+  analysis: string;
 }
 
 const SoilAdvisor: React.FC = () => {
@@ -51,14 +55,28 @@ const SoilAdvisor: React.FC = () => {
     setResponse(null);
 
     try {
-      const apiResponse = await fetch('https://interserver-production-c8af.up.railway.app/api/npk', {
+      // Transform the data to match API expectations
+      const apiData = {
+        nitrogen: formData.N,
+        phosphorus: formData.P,
+        potassium: formData.K,
+        temperature: formData.temperature,
+        moisture: formData.humidity, // API expects 'moisture' not 'humidity'
+        ph: formData.ph
+      };
+
+      // Use localhost for development, or switch to production URL
+      const apiUrl = 'http://localhost:3000/api/npk';
+      // const apiUrl = 'https://interserver-production-c8af.up.railway.app/api/npk';
+
+      const apiResponse = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
         mode: 'cors', // Explicitly set CORS mode
-        body: JSON.stringify(formData),
+        body: JSON.stringify(apiData),
       });
 
       if (!apiResponse.ok) {
@@ -118,45 +136,6 @@ const SoilAdvisor: React.FC = () => {
     });
     setResponse(null);
     setError(null);
-  };
-
-  const loadMockData = () => {
-    setLoading(true);
-    setError(null);
-    
-    // Simulate API delay
-    setTimeout(() => {
-      setResponse({
-        prediction: "Rice",
-        confidence: 0.85,
-        recommendations: [
-          "Consider adding organic matter to improve soil structure",
-          "Monitor irrigation schedule based on rainfall patterns", 
-          "Apply balanced NPK fertilizer based on soil test results",
-          "Test soil pH regularly and adjust if needed"
-        ],
-        nutrient_status: {
-          nitrogen: "Medium",
-          phosphorus: "Low",
-          potassium: "High"
-        }
-      });
-      setLoading(false);
-    }, 1500);
-  };
-
-  const loadSampleData = (sampleType: string) => {
-    const samples = {
-      'rice': { N: 80, P: 40, K: 40, temperature: 28, humidity: 70, ph: 6.5, rainfall: 1200 },
-      'wheat': { N: 120, P: 60, K: 40, temperature: 22, humidity: 60, ph: 7.0, rainfall: 600 },
-      'corn': { N: 150, P: 60, K: 50, temperature: 25, humidity: 65, ph: 6.8, rainfall: 800 },
-      'soybean': { N: 40, P: 80, K: 60, temperature: 24, humidity: 65, ph: 6.2, rainfall: 700 }
-    };
-    
-    const sample = samples[sampleType as keyof typeof samples];
-    if (sample) {
-      setFormData(sample);
-    }
   };
 
   return (
@@ -325,56 +304,6 @@ const SoilAdvisor: React.FC = () => {
                   Reset
                 </button>
               </div>
-
-              {/* Sample Data Buttons */}
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Test with Sample Data:</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => loadSampleData('rice')}
-                    className="text-xs bg-green-50 text-green-700 px-3 py-2 rounded border border-green-200 hover:bg-green-100 transition-colors"
-                  >
-                    🌾 Rice Conditions
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadSampleData('wheat')}
-                    className="text-xs bg-yellow-50 text-yellow-700 px-3 py-2 rounded border border-yellow-200 hover:bg-yellow-100 transition-colors"
-                  >
-                    🌾 Wheat Conditions
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadSampleData('corn')}
-                    className="text-xs bg-orange-50 text-orange-700 px-3 py-2 rounded border border-orange-200 hover:bg-orange-100 transition-colors"
-                  >
-                    🌽 Corn Conditions
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadSampleData('soybean')}
-                    className="text-xs bg-purple-50 text-purple-700 px-3 py-2 rounded border border-purple-200 hover:bg-purple-100 transition-colors"
-                  >
-                    🌱 Soybean Conditions
-                  </button>
-                </div>
-              </div>
-
-              {/* Development/Demo Button */}
-              <div className="border-t pt-4">
-                <button
-                  type="button"
-                  onClick={loadMockData}
-                  disabled={loading}
-                  className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  🧪 Try with Mock Data (Demo)
-                </button>
-                <p className="text-xs text-gray-500 mt-1 text-center">
-                  Use this if the API is not accessible due to CORS or network issues
-                </p>
-              </div>
             </form>
           </div>
 
@@ -409,7 +338,7 @@ const SoilAdvisor: React.FC = () => {
                         <li>Check your internet connection</li>
                         <li>The API server might be temporarily unavailable</li>
                         <li>CORS restrictions may be blocking the request</li>
-                        <li>Try using the "Mock Data" button below for demonstration</li>
+                        <li>Contact the API provider to resolve connectivity issues</li>
                       </ul>
                     </div>
                     
@@ -420,67 +349,60 @@ const SoilAdvisor: React.FC = () => {
                       >
                         Dismiss
                       </button>
-                      <button
-                        onClick={loadMockData}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium border-l border-red-300 pl-2"
-                      >
-                        Try Mock Data
-                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {response && (
+            {response && response.success && (
               <div className="space-y-6">
-                {/* Main Prediction */}
+                {/* Analysis Results */}
                 <div className="bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
                   <div className="flex items-center space-x-3 mb-3">
                     <Target className="w-6 h-6 text-green-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">Recommended Crop</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Soil Analysis & Recommendations</h3>
                   </div>
-                  <p className="text-2xl font-bold text-green-700 mb-2">{response.prediction}</p>
-                  {response.confidence && (
-                    <p className="text-sm text-gray-600">Confidence: {(response.confidence * 100).toFixed(1)}%</p>
-                  )}
+                  <div className="bg-white rounded-lg p-4 shadow-sm">
+                    <pre className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
+                      {response.analysis}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    Analysis generated on: {new Date(response.timestamp).toLocaleString()}
+                  </p>
                 </div>
 
-                {/* Nutrient Status */}
-                {response.nutrient_status && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-gray-900">Nutrient Analysis</h4>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-green-50 p-3 rounded-lg text-center">
-                        <p className="text-sm font-medium text-gray-700">Nitrogen</p>
-                        <p className="text-lg font-bold text-green-600">{response.nutrient_status.nitrogen}</p>
-                      </div>
-                      <div className="bg-orange-50 p-3 rounded-lg text-center">
-                        <p className="text-sm font-medium text-gray-700">Phosphorus</p>
-                        <p className="text-lg font-bold text-orange-600">{response.nutrient_status.phosphorus}</p>
-                      </div>
-                      <div className="bg-purple-50 p-3 rounded-lg text-center">
-                        <p className="text-sm font-medium text-gray-700">Potassium</p>
-                        <p className="text-lg font-bold text-purple-600">{response.nutrient_status.potassium}</p>
-                      </div>
+                {/* Input Summary */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-gray-900">Input Parameters</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="bg-green-50 p-3 rounded-lg text-center">
+                      <p className="text-sm font-medium text-gray-700">Nitrogen</p>
+                      <p className="text-lg font-bold text-green-600">{response.input.nitrogen}</p>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded-lg text-center">
+                      <p className="text-sm font-medium text-gray-700">Phosphorus</p>
+                      <p className="text-lg font-bold text-orange-600">{response.input.phosphorus}</p>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg text-center">
+                      <p className="text-sm font-medium text-gray-700">Potassium</p>
+                      <p className="text-lg font-bold text-purple-600">{response.input.potassium}</p>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded-lg text-center">
+                      <p className="text-sm font-medium text-gray-700">pH Level</p>
+                      <p className="text-lg font-bold text-blue-600">{response.input.ph}</p>
+                    </div>
+                    <div className="bg-indigo-50 p-3 rounded-lg text-center">
+                      <p className="text-sm font-medium text-gray-700">Moisture</p>
+                      <p className="text-lg font-bold text-indigo-600">{response.input.moisture}%</p>
+                    </div>
+                    <div className="bg-red-50 p-3 rounded-lg text-center">
+                      <p className="text-sm font-medium text-gray-700">Temperature</p>
+                      <p className="text-lg font-bold text-red-600">{response.input.temperature}°C</p>
                     </div>
                   </div>
-                )}
-
-                {/* Recommendations */}
-                {response.recommendations && response.recommendations.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Additional Recommendations</h4>
-                    <div className="space-y-2">
-                      {response.recommendations.map((rec, index) => (
-                        <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                          <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-gray-700">{rec}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 {/* Raw Response (for debugging) */}
                 <details className="mt-6">

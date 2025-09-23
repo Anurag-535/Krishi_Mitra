@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Satellite, 
   Camera, 
@@ -18,14 +18,59 @@ import {
   MapPin,
   Crosshair,
   Scan,
-  Brain
+  Brain,
+  RefreshCw,
+  Clock
 } from 'lucide-react';
+import LeafletMap from '../components/LeafletMap';
+import { sentinel2Service, type SpectralIndices } from '../utils/sentinel2Service';
 
 const FieldExplorer: React.FC = () => {
   const [selectedField, setSelectedField] = useState('field-1');
   const [selectedLayer, setSelectedLayer] = useState('ndvi');
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'satellite' | 'analysis' | 'zones'>('analysis');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [spectralIndices, setSpectralIndices] = useState<SpectralIndices | null>(null);
+  const [isLoadingSatelliteData, setIsLoadingSatelliteData] = useState(false);
+  const [satelliteMetadata, setSatelliteMetadata] = useState<any>(null);
+
+  // Load satellite data when field or date changes
+  useEffect(() => {
+    const loadSatelliteData = async () => {
+      setIsLoadingSatelliteData(true);
+      try {
+        const sentinel2Data = await sentinel2Service.fetchSentinel2Data(selectedField, selectedDate);
+        const indices = sentinel2Service.calculateSpectralIndices(sentinel2Data);
+        setSpectralIndices(indices);
+        setSatelliteMetadata(sentinel2Data.metadata);
+      } catch (error) {
+        console.error('Failed to load satellite data:', error);
+      } finally {
+        setIsLoadingSatelliteData(false);
+      }
+    };
+
+    loadSatelliteData();
+  }, [selectedField, selectedDate]);
+
+  // Load available dates for selected field
+  useEffect(() => {
+    const dates = sentinel2Service.getAvailableDates(selectedField);
+    setAvailableDates(dates);
+    if (dates.length > 0 && !selectedDate) {
+      setSelectedDate(dates[0]); // Set most recent date
+    }
+  }, [selectedField]);
+
+  // Get current spectral data for visualization
+  const getCurrentSpectralData = (): number[][] => {
+    if (!spectralIndices) {
+      return Array(50).fill(0).map(() => Array(50).fill(0.5)); // Default data
+    }
+    return sentinel2Service.getVisualizationData(spectralIndices, selectedLayer);
+  };
 
   const fields = [
     { id: 'field-1', name: 'North Field', area: '25.6 ha', crop: 'Wheat', status: 'healthy' },
@@ -37,9 +82,9 @@ const FieldExplorer: React.FC = () => {
     { id: 'ndvi', name: 'NDVI', description: 'Vegetation Health', color: 'from-red-500 to-green-500' },
     { id: 'evi', name: 'EVI', description: 'Enhanced Vegetation', color: 'from-purple-500 to-yellow-500' },
     { id: 'savi', name: 'SAVI', description: 'Soil Adjusted', color: 'from-blue-500 to-green-500' },
+    { id: 'ndwi', name: 'NDWI', description: 'Water Content', color: 'from-brown-500 to-blue-500' },
     { id: 'chlorophyll', name: 'Chlorophyll', description: 'Chlorophyll Content', color: 'from-yellow-500 to-green-500' },
-    { id: 'water', name: 'Water Content', description: 'Moisture Levels', color: 'from-brown-500 to-blue-500' },
-    { id: 'stress', name: 'Stress Index', description: 'Plant Stress', color: 'from-green-500 to-red-500' }
+    { id: 'lai', name: 'LAI', description: 'Leaf Area Index', color: 'from-orange-500 to-green-500' }
   ];
 
   const currentFieldData = {
@@ -61,6 +106,44 @@ const FieldExplorer: React.FC = () => {
       ]
     }
   };
+
+  // Get real-time spectral data from Sentinel-2 or fallback to mock data
+  const getFieldSpectralData = () => {
+    if (spectralIndices) {
+      // Calculate average values from spectral indices arrays
+      const calculateAverage = (data: number[][]) => {
+        const total = data.reduce((sum, row) => sum + row.reduce((rowSum, val) => rowSum + val, 0), 0);
+        return total / (data.length * data[0].length);
+      };
+
+      return {
+        ndvi: calculateAverage(spectralIndices.ndvi),
+        evi: calculateAverage(spectralIndices.evi),
+        savi: calculateAverage(spectralIndices.savi),
+        ndwi: calculateAverage(spectralIndices.ndwi),
+        chlorophyll: calculateAverage(spectralIndices.chlorophyll) * 50, // Scale to μg/cm²
+        lai: calculateAverage(spectralIndices.lai),
+        waterContent: (calculateAverage(spectralIndices.ndwi) + 1) * 50, // Convert NDWI to percentage
+        stressIndex: Math.max(0, 1 - calculateAverage(spectralIndices.ndvi))
+      };
+    }
+    
+    // Fallback mock data with all properties
+    const mockData = currentFieldData[selectedField as keyof typeof currentFieldData];
+    if (mockData) {
+      return {
+        ...mockData,
+        ndwi: 0.3,
+        lai: 3.2
+      };
+    }
+    
+    return {
+      ndvi: 0.75, evi: 0.62, savi: 0.68, ndwi: 0.3, chlorophyll: 38.5, lai: 3.2, waterContent: 65, stressIndex: 0.25
+    };
+  };
+
+  const currentSpectralData = getFieldSpectralData();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -212,11 +295,25 @@ const FieldExplorer: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-gray-900 flex items-center">
                     <Scan className="w-6 h-6 mr-2 text-blue-600" />
-                    {viewMode === 'satellite' && 'Satellite Imagery'}
+                    {viewMode === 'satellite' && 'Sentinel-2 Satellite Imagery'}
                     {viewMode === 'analysis' && `Spectral Analysis - ${spectralLayers.find(l => l.id === selectedLayer)?.name}`}
                     {viewMode === 'zones' && 'Zone Management'}
                   </h3>
                   <div className="flex items-center space-x-2">
+                    {/* Date Selection for Satellite Data */}
+                    {availableDates.length > 0 && (
+                      <select
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {availableDates.slice(0, 10).map((date) => (
+                          <option key={date} value={date}>
+                            {new Date(date).toLocaleDateString()}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                       <Filter className="w-5 h-5 text-gray-600" />
                     </button>
@@ -227,66 +324,69 @@ const FieldExplorer: React.FC = () => {
                 </div>
               </div>
               
-              {/* Simulated Map Area */}
-              <div className="relative h-96 bg-gradient-to-br from-green-100 to-blue-100">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center p-8 bg-white bg-opacity-90 rounded-xl shadow-lg">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center">
-                      {viewMode === 'satellite' && <Satellite className="w-8 h-8 text-white" />}
-                      {viewMode === 'analysis' && <Brain className="w-8 h-8 text-white" />}
-                      {viewMode === 'zones' && <Target className="w-8 h-8 text-white" />}
-                    </div>
-                    <h4 className="text-xl font-semibold text-gray-900 mb-2">
-                      {viewMode === 'satellite' && 'High-Resolution Satellite View'}
-                      {viewMode === 'analysis' && 'Hyperspectral Analysis Map'}
-                      {viewMode === 'zones' && 'Field Zone Mapping'}
-                    </h4>
-                    <p className="text-gray-600 mb-4">
-                      {viewMode === 'satellite' && 'Latest satellite imagery with 1m resolution'}
-                      {viewMode === 'analysis' && `${spectralLayers.find(l => l.id === selectedLayer)?.description} visualization`}
-                      {viewMode === 'zones' && 'Interactive zone-based field management'}
-                    </p>
-                    <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-                      <span className="flex items-center">
-                        <Crosshair className="w-4 h-4 mr-1" />
-                        Click to analyze
-                      </span>
-                      <span className="flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        GPS coordinates
-                      </span>
+              {/* Conditional Rendering Based on View Mode */}
+              {viewMode === 'satellite' || viewMode === 'analysis' ? (
+                <LeafletMap
+                  fieldId={selectedField}
+                  selectedLayer={selectedLayer}
+                  spectralData={getCurrentSpectralData()}
+                  onDataUpdate={(data: any) => {
+                    console.log('Satellite data updated:', data);
+                    // Handle metadata updates here
+                  }}
+                />
+              ) : (
+                /* Zone Management View */
+                <div className="relative h-96 bg-gradient-to-br from-green-100 to-blue-100">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center p-8 bg-white bg-opacity-90 rounded-xl shadow-lg">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center">
+                        <Target className="w-8 h-8 text-white" />
+                      </div>
+                      <h4 className="text-xl font-semibold text-gray-900 mb-2">Field Zone Mapping</h4>
+                      <p className="text-gray-600 mb-4">Interactive zone-based field management</p>
+                      <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
+                        <span className="flex items-center">
+                          <Crosshair className="w-4 h-4 mr-1" />
+                          Click to analyze
+                        </span>
+                        <span className="flex items-center">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          GPS coordinates
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                {/* Simulated zones overlay for zone view */}
-                {viewMode === 'zones' && currentFieldData[selectedField as keyof typeof currentFieldData] && (
-                  <div className="absolute inset-4">
-                    <div className="grid grid-cols-3 gap-2 h-full">
-                      {currentFieldData[selectedField as keyof typeof currentFieldData].zones.map((zone, i) => (
-                        <button
-                          key={zone.id}
-                          onClick={() => setSelectedZone(selectedZone === zone.id ? null : zone.id)}
-                          className={`rounded-lg border-2 transition-all ${
-                            selectedZone === zone.id
-                              ? 'border-blue-500 bg-blue-100 bg-opacity-50'
-                              : 'border-white bg-white bg-opacity-30 hover:bg-opacity-50'
-                          }`}
-                        >
-                          <div className="h-full flex items-center justify-center">
-                            <div className="text-center">
-                              <div className="font-semibold text-gray-900">{zone.name}</div>
-                              <div className={`text-sm px-2 py-1 rounded-full mt-1 ${getStatusColor(zone.status)}`}>
-                                {zone.health}%
+                  
+                  {/* Simulated zones overlay for zone view */}
+                  {currentFieldData[selectedField as keyof typeof currentFieldData] && (
+                    <div className="absolute inset-4">
+                      <div className="grid grid-cols-3 gap-2 h-full">
+                        {currentFieldData[selectedField as keyof typeof currentFieldData].zones.map((zone) => (
+                          <button
+                            key={zone.id}
+                            onClick={() => setSelectedZone(selectedZone === zone.id ? null : zone.id)}
+                            className={`rounded-lg border-2 transition-all ${
+                              selectedZone === zone.id
+                                ? 'border-blue-500 bg-blue-100 bg-opacity-50'
+                                : 'border-white bg-white bg-opacity-30 hover:bg-opacity-50'
+                            }`}
+                          >
+                            <div className="h-full flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="font-semibold text-gray-900">{zone.name}</div>
+                                <div className={`text-sm px-2 py-1 rounded-full mt-1 ${getStatusColor(zone.status)}`}>
+                                  {zone.health}%
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Bottom Data Panels */}
@@ -296,32 +396,70 @@ const FieldExplorer: React.FC = () => {
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <BarChart3 className="w-5 h-5 mr-2 text-green-600" />
-                  Spectral Indices
+                  Real-time Spectral Indices
+                  {satelliteMetadata && (
+                    <span className="ml-2 text-sm text-gray-500">
+                      (Sentinel-2 {satelliteMetadata.acquisitionDate})
+                    </span>
+                  )}
                 </h3>
                 
-                {currentFieldData[selectedField as keyof typeof currentFieldData] && (
+                {isLoadingSatelliteData ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Loading satellite data...</span>
+                  </div>
+                ) : (
                   <div className="space-y-4">
                     {[
-                      { name: 'NDVI', value: currentFieldData[selectedField as keyof typeof currentFieldData].ndvi, max: 1 },
-                      { name: 'EVI', value: currentFieldData[selectedField as keyof typeof currentFieldData].evi, max: 1 },
-                      { name: 'SAVI', value: currentFieldData[selectedField as keyof typeof currentFieldData].savi, max: 1 },
-                      { name: 'Chlorophyll', value: currentFieldData[selectedField as keyof typeof currentFieldData].chlorophyll, max: 50, unit: 'μg/cm²' }
+                      { name: 'NDVI', value: currentSpectralData.ndvi, max: 1, description: 'Vegetation health indicator' },
+                      { name: 'EVI', value: currentSpectralData.evi, max: 1, description: 'Enhanced vegetation index' },
+                      { name: 'SAVI', value: currentSpectralData.savi, max: 1, description: 'Soil-adjusted vegetation' },
+                      { name: 'NDWI', value: currentSpectralData.ndwi, max: 1, description: 'Water content indicator' },
+                      { name: 'Chlorophyll', value: currentSpectralData.chlorophyll, max: 50, unit: 'μg/cm²', description: 'Chlorophyll concentration' },
+                      { name: 'LAI', value: currentSpectralData.lai, max: 8, unit: 'm²/m²', description: 'Leaf area index' }
                     ].map((index, i) => (
                       <div key={i}>
                         <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-gray-700">{index.name}</span>
-                          <span className="text-sm text-gray-600">
-                            {index.value}{index.unit || ''}
+                          <div className="flex items-center">
+                            <span className="font-medium text-gray-700">{index.name}</span>
+                            <span className="ml-2 text-xs text-gray-500 hidden sm:block">
+                              {index.description}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-600 font-medium">
+                            {index.value.toFixed(2)}{index.unit || ''}
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div 
-                            className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all duration-300"
-                            style={{ width: `${(index.value / index.max) * 100}%` }}
+                            className={`h-3 rounded-full transition-all duration-500 ${
+                              index.value / index.max > 0.7 ? 'bg-gradient-to-r from-green-400 to-green-600' :
+                              index.value / index.max > 0.4 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' :
+                              'bg-gradient-to-r from-red-400 to-red-600'
+                            }`}
+                            style={{ width: `${Math.min((index.value / index.max) * 100, 100)}%` }}
                           ></div>
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Satellite metadata */}
+                    {satelliteMetadata && (
+                      <div className="mt-6 pt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Satellite Data Quality</h4>
+                        <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
+                          <div>
+                            <span className="font-medium">Cloud Cover:</span>
+                            <span className="ml-1">{satelliteMetadata.cloudCover.toFixed(1)}%</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Resolution:</span>
+                            <span className="ml-1">{satelliteMetadata.resolution}m</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

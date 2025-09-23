@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Satellite, Bell, BarChart3, Settings, Brain } from 'lucide-react';
+import { Home, Satellite, Bell, BarChart3, Settings, Brain, Leaf } from 'lucide-react';
 
 interface NavigationProps {
   currentPage: string;
@@ -10,6 +10,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'field-explorer', label: 'Field Explorer', icon: Satellite },
+    { id: 'soil-advisor', label: 'Soil Advisor', icon: Leaf },
     { id: 'alerts', label: 'Alert Center', icon: Bell },
     { id: 'reports', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Farm Management', icon: Settings }

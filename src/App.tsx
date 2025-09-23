@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Navigation from './components/Navigation';
 import Dashboard from './pages/Dashboard';
 import FieldExplorer from './pages/FieldExplorer';
+import SoilAdvisor from './pages/SoilAdvisor';
 import AlertsCenter from './pages/AlertsCenter';
 import ReportsTrends from './pages/ReportsTrends';
 import FarmManagement from './pages/FarmManagement';
@@ -15,6 +16,8 @@ function App() {
         return <Dashboard onNavigate={setCurrentPage} />;
       case 'field-explorer':
         return <FieldExplorer />;
+      case 'soil-advisor':
+        return <SoilAdvisor />;
       case 'alerts':
         return <AlertsCenter />;
       case 'reports':

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Map, AlertTriangle, TrendingUp, Settings } from 'lucide-react';
+import { Home, Satellite, Bell, BarChart3, Settings, Brain } from 'lucide-react';
 
 interface NavigationProps {
   currentPage: string;
@@ -9,21 +9,24 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'field-explorer', label: 'Fields', icon: Map },
-    { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
-    { id: 'reports', label: 'Reports', icon: TrendingUp },
-    { id: 'settings', label: 'Settings', icon: Settings }
+    { id: 'field-explorer', label: 'Field Explorer', icon: Satellite },
+    { id: 'alerts', label: 'Alert Center', icon: Bell },
+    { id: 'reports', label: 'Analytics', icon: BarChart3 },
+    { id: 'settings', label: 'Farm Management', icon: Settings }
   ];
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">🌾</span>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <Brain className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl font-semibold text-gray-900">Green Valley Farm</h1>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Krishi Mitra AI</h1>
+              <p className="text-xs text-gray-600">Agricultural Intelligence</p>
+            </div>
           </div>
           
           <div className="flex space-x-1">
@@ -35,9 +38,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 <button
                   key={item.id}
                   onClick={() => onPageChange(item.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 min-h-[44px] ${
                     isActive
-                      ? 'bg-green-100 text-green-700 border-2 border-green-300'
+                      ? 'bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
@@ -46,6 +49,17 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 </button>
               );
             })}
+          </div>
+          
+          {/* User Section */}
+          <div className="flex items-center space-x-3">
+            <div className="hidden md:block text-right">
+              <div className="text-sm font-medium text-gray-900">Farm Manager</div>
+              <div className="text-xs text-gray-600">Online</div>
+            </div>
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-gray-700">FM</span>
+            </div>
           </div>
         </div>
       </div>

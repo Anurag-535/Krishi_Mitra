@@ -66,7 +66,7 @@ const SoilAdvisor: React.FC = () => {
       };
 
       // Use localhost for development, or switch to production URL
-      const apiUrl = 'http://localhost:3000/api/npk';
+      const apiUrl = 'http://192.168.67.199:3000/api/npk';
       // const apiUrl = 'https://interserver-production-c8af.up.railway.app/api/npk';
 
       const apiResponse = await fetch(apiUrl, {
@@ -364,9 +364,9 @@ const SoilAdvisor: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900">Soil Analysis & Recommendations</h3>
                   </div>
                   <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <pre className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                      {response.analysis}
-                    </pre>
+                      <pre className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
+                        {(response.analysis || '').replace(/[\*#]/g, '')}
+                      </pre>
                   </div>
                   <p className="text-xs text-gray-500 mt-3">
                     Analysis generated on: {new Date(response.timestamp).toLocaleString()}

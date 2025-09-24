@@ -66,7 +66,9 @@ const KrishiGPT: React.FC = () => {
     } catch (err) {
       botResponse = 'Error contacting Gemini API.';
     }
-    setMessages((prev) => [...prev, { sender: 'bot', text: botResponse }]);
+  // Remove '*' and '#' from bot response
+  const sanitizedBotResponse = (botResponse || '').replace(/[\*#]/g, '');
+  setMessages((prev) => [...prev, { sender: 'bot', text: sanitizedBotResponse }]);
     setLoading(false);
     setInput('');
     setImage(null);

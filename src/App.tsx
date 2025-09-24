@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Navigation from './components/Navigation';
+import KrishiGPT from './components/GeminiChatBot';
 import Dashboard from './pages/Dashboard';
 import FieldExplorer from './pages/FieldExplorer';
 import SoilAdvisor from './pages/SoilAdvisor';
@@ -35,10 +36,10 @@ function App() {
         currentPage={currentPage} 
         onPageChange={setCurrentPage} 
       />
-      
       <main className="py-6">
         {renderCurrentPage()}
       </main>
+  <KrishiGPT />
     </div>
   );
 }

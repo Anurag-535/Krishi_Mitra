@@ -1,4 +1,4 @@
-Krishi_Mitr# 🌱 Krishi Mitra – AI-powered Crop Monitoring
+# 🌱 Krishi Mitra – AI-powered Crop Monitoring
 
 **Smart India Hackathon 2025**  
 **Team Vanquish | Team ID: 80928**  
